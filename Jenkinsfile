@@ -52,9 +52,11 @@ pipeline {
         stage('Update values.yaml & Deploy to Kubernetes') {
             steps {
                 echo 'Helm Chart içerisindeki values.yaml güncelleniyor ve deploy başlatılıyor...'
-                // values.yaml dosyasındaki repository ve tag değerlerini güncelliyoruz
-                sh "sed -i 's|^\\s*repository:.*|    repository: ${IMAGE_NAME}|' helm/flask-mongodb/values.yaml"
-                sh "sed -i 's/^\\s*tag:.*/    tag: \"${env.COMMIT_SHA}\"/' helm/flask-mongodb/values.yaml"
+                // values.yaml dosyasındaki SADECE flask uygulamasının repository ve tag değerlerini güncelliyoruz
+                sh """
+                sed -i '/^flask:/,/^mongodb:/ s|^\\(\\s*\\)repository:.*|\\1repository: ${IMAGE_NAME}|' helm/flask-mongodb/values.yaml
+                sed -i '/^flask:/,/^mongodb:/ s|^\\(\\s*\\)tag:.*|\\1tag: "${env.COMMIT_SHA}"|' helm/flask-mongodb/values.yaml
+                """
                 
                 // Kubeconfig dosyasını kopyalayıp 127.0.0.1'i host.docker.internal yapıyoruz
                 // Ayrıca TLS sertifika doğrulamasını atlıyoruz (çünkü host.docker.internal sertifikada yok)
