@@ -164,4 +164,4 @@ CMD ["gunicorn", \
      "--timeout", "120", \
      "--access-logfile", "-", \
      "--error-logfile", "-", \
-     "app:app"]
+     "app.app:app"]
