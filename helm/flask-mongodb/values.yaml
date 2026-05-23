@@ -41,15 +41,14 @@ flask:
   replicas: 2
 
   image:
-    # Repository: Local Minikube image kullanıyoruz
+    # Repository: Docker Hub üzerindeki imaj adresi
     # Production'da: docker.io/username/flask-app veya ECR/GCR adresi
-    repository: flask-app
+    repository: fatmanurcepken/flask-app
     tag: "latest"
     # Never: Local image kullan (Minikube için)
     # Always: Her zaman registry'den çek (production)
     # IfNotPresent: Lokal yoksa registry'den çek
-    pullPolicy: Never
-
+    pullPolicy: Always
   service:
     type: NodePort
     port: 5000
