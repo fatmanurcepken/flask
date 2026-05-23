@@ -56,8 +56,15 @@ pipeline {
                 sh "sed -i 's|^\\s*repository:.*|    repository: ${IMAGE_NAME}|' helm/flask-mongodb/values.yaml"
                 sh "sed -i 's/^\\s*tag:.*/    tag: \"${env.COMMIT_SHA}\"/' helm/flask-mongodb/values.yaml"
                 
-                // Güncellenmiş Chart ile Minikube üzerine kur / güncelle
-                sh "helm upgrade --install flask-app ./helm/flask-mongodb --namespace flask-mongodb --create-namespace"
+                // Kubeconfig dosyasını kopyalayıp 127.0.0.1'i host.docker.internal yapıyoruz
+                // Çünkü konteyner içindeki 127.0.0.1 Jenkins'in kendisini işaret eder!
+                sh """
+                mkdir -p /tmp/.kube
+                cp -r /var/jenkins_home/.kube/* /tmp/.kube/ || true
+                sed -i 's/127.0.0.1/host.docker.internal/g' /tmp/.kube/config
+                export KUBECONFIG=/tmp/.kube/config
+                helm upgrade --install flask-app ./helm/flask-mongodb --namespace flask-mongodb --create-namespace
+                """
                 
                 echo 'Deploy tamamlandı!'
             }
