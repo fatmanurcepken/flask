@@ -1,0 +1,139 @@
+{{/*
+=============================================================================
+flask-deployment.yaml — Helm Template: Flask Uygulama Deployment
+=============================================================================
+*/}}
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Release.Name }}-flask-app
+  namespace: {{ include "flask-mongodb.namespace" . }}
+  labels:
+    {{- include "flask-mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flask-app
+
+spec:
+  replicas: {{ .Values.flask.replicas }}
+
+  selector:
+    matchLabels:
+      {{- include "flask-mongodb.flask.selectorLabels" . | nindent 6 }}
+
+  strategy:
+    type: {{ .Values.flask.strategy.type }}
+    {{- if eq .Values.flask.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ .Values.flask.strategy.maxSurge }}
+      maxUnavailable: {{ .Values.flask.strategy.maxUnavailable }}
+    {{- end }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "flask-mongodb.flask.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: flask-app
+
+    spec:
+      # initContainer: MongoDB hazır olana kadar bekle
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "MongoDB bekleniyor: {{ include "flask-mongodb.mongodb.serviceName" . }}:{{ .Values.mongodb.service.port }}"
+              until nc -z -w 2 {{ include "flask-mongodb.mongodb.serviceName" . }} {{ .Values.mongodb.service.port }}; do
+                echo "MongoDB henüz hazır değil. 3 saniye bekleniyor..."
+                sleep 3
+              done
+              echo "MongoDB hazır!"
+
+      containers:
+        - name: flask-app
+          image: "{{ .Values.flask.image.repository }}:{{ .Values.flask.image.tag }}"
+          imagePullPolicy: {{ .Values.flask.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.flask.service.port }}
+              protocol: TCP
+
+          env:
+            # Secret'tan hassas değerler
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flask-mongodb.secretName" . }}
+                  key: MONGO_INITDB_ROOT_USERNAME
+
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flask-mongodb.secretName" . }}
+                  key: MONGO_INITDB_ROOT_PASSWORD
+
+            - name: FLASK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flask-mongodb.secretName" . }}
+                  key: FLASK_SECRET_KEY
+
+            # ConfigMap'ten hassas olmayan değerler
+            - name: MONGO_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flask-mongodb.configmapName" . }}
+                  key: MONGO_HOST
+
+            - name: MONGO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flask-mongodb.configmapName" . }}
+                  key: MONGO_PORT
+
+            - name: MONGO_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flask-mongodb.configmapName" . }}
+                  key: MONGO_DB_NAME
+
+            - name: FLASK_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flask-mongodb.configmapName" . }}
+                  key: FLASK_ENV
+
+            - name: FLASK_DEBUG
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "flask-mongodb.configmapName" . }}
+                  key: FLASK_DEBUG
+
+          resources:
+            requests:
+              memory: {{ .Values.flask.resources.requests.memory | quote }}
+              cpu: {{ .Values.flask.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.flask.resources.limits.memory | quote }}
+              cpu: {{ .Values.flask.resources.limits.cpu | quote }}
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.flask.service.port }}
+            initialDelaySeconds: {{ .Values.flask.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.flask.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.flask.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.flask.probes.liveness.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.flask.service.port }}
+            initialDelaySeconds: {{ .Values.flask.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.flask.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.flask.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.flask.probes.readiness.failureThreshold }}

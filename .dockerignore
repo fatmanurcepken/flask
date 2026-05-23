@@ -1,0 +1,63 @@
+# =============================================================================
+# .dockerignore — Docker Build Context'ten Hariç Tutulacak Dosyalar
+# =============================================================================
+#
+# .dockerignore Nedir?
+# ====================
+# Docker image build ederken, Docker tüm dosyaları "build context" olarak
+# Docker daemon'a gönderir. Bu, büyük dizinlerde (node_modules, .git, .venv)
+# build süresini ve image boyutunu ciddi şekilde artırır.
+#
+# .dockerignore ile gereksiz dosyaları build context'ten çıkarırız.
+# Bu dosya .gitignore ile aynı syntax'ı kullanır.
+#
+# Avantajları:
+# 1. Daha hızlı build (daha az dosya transfer edilir)
+# 2. Daha küçük image (gereksiz dosyalar dahil edilmez)
+# 3. Güvenlik (.env, .git gibi hassas dosyalar image'a girmez)
+
+# Python cache dosyaları — bytecode ve cache dizinleri
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Git dizini — versiyon kontrol geçmişi image'da gereksiz
+.git
+.gitignore
+
+# Virtual environment — container kendi Python ortamını kullanır
+.venv
+venv
+env
+
+# Environment dosyası — şifreler ve hassas bilgiler
+# .env dosyası docker-compose.yml üzerinden enjekte edilir,
+# image'ın İÇİNE yazılmamalıdır!
+.env
+.env.*
+
+# IDE dosyaları
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docker dosyaları — recursive build'i engellemek için
+docker-compose.yml
+docker-compose*.yml
+Dockerfile
+
+# Dokümantasyon — runtime'da gerekli değil
+README.md
+LICENSE
+*.md
+
+# Test dosyaları — production image'da gereksiz
+tests/
+test_*.py
+*_test.py
+
+# OS dosyaları
+.DS_Store
+Thumbs.db

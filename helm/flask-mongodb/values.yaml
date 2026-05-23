@@ -1,0 +1,154 @@
+# =============================================================================
+# values.yaml — Helm Chart Varsayılan Değerleri
+# =============================================================================
+#
+# values.yaml Nedir?
+# ==================
+# Helm template'lerinde kullanılan varsayılan değerleri tanımlar.
+# Bu değerler şu şekillerde override edilebilir:
+#
+# 1. Komut satırından:
+#    helm install flask-app ./helm/flask-mongodb --set flask.replicas=3
+#
+# 2. Özel values dosyası ile:
+#    helm install flask-app ./helm/flask-mongodb -f my-values.yaml
+#    (Örnek: production ortamı için production-values.yaml)
+#
+# 3. Birden fazla values dosyası:
+#    helm install flask-app ./helm/flask-mongodb -f base.yaml -f prod.yaml
+#    (Sağdaki dosya soldakini override eder)
+#
+# Template'lerde Kullanım:
+# {{ .Values.flask.replicas }}  → 2
+# {{ .Values.mongodb.image.tag }} → 7.0
+# =============================================================================
+
+# =============================================================================
+# Genel Ayarlar
+# =============================================================================
+nameOverride: ""        # Chart adını override et (boş = Chart.yaml'daki name)
+fullnameOverride: ""    # Tam adı override et (boş = release-name + chart-name)
+
+namespace:
+  create: true          # Namespace otomatik oluşturulsun mu?
+  name: flask-mongodb
+
+# =============================================================================
+# Flask Uygulama Ayarları
+# =============================================================================
+flask:
+  # Replica sayısı — Flask stateless olduğu için yatay ölçekleme yapılabilir
+  replicas: 2
+
+  image:
+    # Repository: Local Minikube image kullanıyoruz
+    # Production'da: docker.io/username/flask-app veya ECR/GCR adresi
+    repository: flask-app
+    tag: "latest"
+    # Never: Local image kullan (Minikube için)
+    # Always: Her zaman registry'den çek (production)
+    # IfNotPresent: Lokal yoksa registry'den çek
+    pullPolicy: Never
+
+  service:
+    type: NodePort
+    port: 5000
+    nodePort: 30500
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  # Health check probe ayarları
+  probes:
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+  # Rolling update stratejisi
+  strategy:
+    type: RollingUpdate
+    maxSurge: 1
+    maxUnavailable: 0
+
+  # Environment değişkenleri (hassas olmayanlar)
+  env:
+    FLASK_ENV: "production"
+    FLASK_DEBUG: "0"
+
+# =============================================================================
+# MongoDB Ayarları
+# =============================================================================
+mongodb:
+  replicas: 1   # MongoDB için her zaman 1 (PVC ReadWriteOnce)
+
+  image:
+    repository: mongo
+    tag: "7.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP   # Dışarıya kapalı (güvenlik)
+    port: 27017
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  # Kalıcı depolama ayarları
+  persistence:
+    enabled: true
+    storageClass: "standard"   # Minikube varsayılan StorageClass
+    size: "1Gi"
+    accessMode: ReadWriteOnce
+
+  # Deployment stratejisi
+  # Recreate: PVC'nin aynı anda birden fazla Pod tarafından kullanılmaması için
+  strategy:
+    type: Recreate
+
+  # Health check probe ayarları
+  probes:
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+# =============================================================================
+# Secret Ayarları
+# =============================================================================
+# NOT: Bu değerleri production'da override edin!
+# Örnek: helm install ... --set secrets.mongoRootPassword=güçlüşifre
+#
+# Bu değerler helm template tarafından Base64'e encode edilir.
+secrets:
+  mongoRootUsername: "admin"
+  mongoRootPassword: "securepassword123"
+  flaskSecretKey: "your-super-secret-key-change-in-production"
+
+# =============================================================================
+# ConfigMap Ayarları
+# =============================================================================
+config:
+  mongoDbName: "TaskManager"

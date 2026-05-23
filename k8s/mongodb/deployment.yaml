@@ -1,0 +1,170 @@
+# =============================================================================
+# deployment.yaml — MongoDB Deployment Tanımı
+# =============================================================================
+#
+# Deployment Nedir?
+# =================
+# Deployment, Kubernetes'e "bu Pod'dan kaç tane çalıştır ve nasıl güncelle"
+# diye söyleyen üst düzey bir kaynak türüdür.
+#
+# Docker Compose ile Karşılaştırma:
+# -----------------------------------
+# Docker Compose'da:
+#   services:
+#     mongodb:
+#       image: mongo:7.0
+#       ...
+# Bu satırlar bir container tanımlar.
+#
+# Kubernetes'te Deployment:
+#   → ReplicaSet oluşturur
+#   → ReplicaSet → Pod'ları oluşturur ve yönetir
+#   → Pod crash olursa otomatik yeniden başlatır
+#   → Rolling update ile sıfır downtime güncelleme yapar
+#
+# Hiyerarşi:
+#   Deployment → ReplicaSet → Pod(lar) → Container(lar)
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: mongodb
+  namespace: flask-mongodb
+  labels:
+    app: mongodb
+    app.kubernetes.io/part-of: flask-mongodb
+
+spec:
+  # replicas: Kaç adet Pod çalıştırılacak?
+  # ----------------------------------------
+  # MongoDB için replicas: 1 kullanıyoruz çünkü:
+  # 1. Tek bir PVC (ReadWriteOnce) paylaşılamaz
+  # 2. MongoDB'de yatay ölçekleme için Replica Set yapısı gerekir
+  #    (bu, farklı bir konfigürasyondur - birden fazla Deployment değil)
+  # Production'da MongoDB Replica Set kurulumu önerilir.
+  replicas: 1
+
+  # selector: Bu Deployment hangi Pod'ları yönetecek?
+  # --------------------------------------------------
+  # Deployment, aşağıdaki label'a sahip Pod'ları yönetir.
+  # Bu label, Pod template'indeki labels ile EŞLEŞMELİDİR.
+  selector:
+    matchLabels:
+      app: mongodb
+
+  # strategy: Pod güncelleme stratejisi
+  # -------------------------------------
+  # Recreate: Önce mevcut Pod'u sil, sonra yeni Pod oluştur.
+  # MongoDB için Recreate tercih edilir çünkü:
+  # - Aynı PVC'ye birden fazla Pod bağlanamaz (ReadWriteOnce)
+  # - Yeni ve eski MongoDB aynı anda aynı dosyalara erişemez
+  strategy:
+    type: Recreate
+
+  # template: Oluşturulacak Pod'un şablonu
+  # ----------------------------------------
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        app.kubernetes.io/part-of: flask-mongodb
+
+    spec:
+      containers:
+        - name: mongodb
+          # Docker Compose'daki "image: mongo:7.0" ile aynı
+          image: mongo:7.0
+
+          ports:
+            - containerPort: 27017
+              name: mongodb
+
+          # Environment değişkenleri SECRET'tan okuma
+          # ------------------------------------------
+          # Docker Compose'da env_file: .env kullandık.
+          # Kubernetes'te secret ve configmap'ten ayrı ayrı okuyoruz.
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: flask-mongodb-secret
+                  key: MONGO_INITDB_ROOT_USERNAME
+
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: flask-mongodb-secret
+                  key: MONGO_INITDB_ROOT_PASSWORD
+
+          # Volume mount: PVC'yi container'a bağla
+          # -----------------------------------------
+          # Docker Compose'da: mongodb-data:/data/db
+          # Kubernetes'te: volumeMount + volumes ile tanımlanır
+          volumeMounts:
+            - name: mongodb-storage
+              mountPath: /data/db
+              # /data/db: MongoDB'nin tüm veritabanı dosyalarını tuttuğu dizin
+
+          # RESOURCE LIMITS ve REQUESTS
+          # ============================
+          # resources.requests: Container'ın GARANTILI alacağı kaynaklar
+          #   Kubernetes, bu kaynağa sahip bir node'a Pod'u zamanlar.
+          #
+          # resources.limits: Container'ın KULLANABILECEĞI maksimum kaynaklar
+          #   Aşılırsa:
+          #   - Memory: OOMKilled (Out of Memory) ile container sonlandırılır
+          #   - CPU: Throttle (kısıtlanır), sonlandırılmaz
+          #
+          # Minikube'de bu değerleri düşük tutuyoruz (local ortam)
+          # Production'da MongoDB için daha fazla kaynak ayrılmalı
+          resources:
+            requests:
+              memory: "256Mi"   # 256 Megabyte minimum garanti
+              cpu: "250m"        # 250 milliCPU = 0.25 CPU çekirdeği
+            limits:
+              memory: "512Mi"   # Maksimum 512 Megabyte
+              cpu: "500m"        # Maksimum 0.5 CPU çekirdeği
+
+          # LIVENESS PROBE
+          # ================
+          # Kubernetes'e "container hala canlı mı?" diye sorar.
+          # Başarısız olursa → container yeniden başlatılır.
+          # Docker Compose'daki healthcheck ile aynı işlevi görür.
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30   # Container başladıktan 30 saniye sonra kontrol et
+            periodSeconds: 10          # Her 10 saniyede bir kontrol et
+            timeoutSeconds: 5          # 5 saniye içinde yanıt vermezse başarısız say
+            failureThreshold: 3        # 3 başarısız denemeden sonra container'ı yeniden başlat
+
+          # READINESS PROBE
+          # ================
+          # Kubernetes'e "container traffic almaya hazır mı?" diye sorar.
+          # Başarısız olursa → Service, bu Pod'a traffic YÖNLENDİRMEZ.
+          # Pod yeniden başlatılmaz, sadece devre dışı bırakılır.
+          # Bu, Flask'ın depends_on: service_healthy ile eşdeğerdir.
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 15   # Container başladıktan 15 saniye sonra ilk kontrol
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      # Volumes: Pod'un kullanacağı storage tanımları
+      # -----------------------------------------------
+      volumes:
+        - name: mongodb-storage
+          persistentVolumeClaim:
+            claimName: mongodb-pvc  # Yukarıda oluşturduğumuz PVC

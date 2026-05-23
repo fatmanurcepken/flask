@@ -1,0 +1,100 @@
+{{/*
+=============================================================================
+mongodb-deployment.yaml — Helm Template: MongoDB Deployment
+=============================================================================
+*/}}
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ .Release.Name }}-mongodb
+  namespace: {{ include "flask-mongodb.namespace" . }}
+  labels:
+    {{- include "flask-mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mongodb
+
+spec:
+  replicas: {{ .Values.mongodb.replicas }}
+
+  selector:
+    matchLabels:
+      {{- include "flask-mongodb.mongodb.selectorLabels" . | nindent 6 }}
+
+  strategy:
+    type: {{ .Values.mongodb.strategy.type }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "flask-mongodb.mongodb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mongodb
+
+    spec:
+      containers:
+        - name: mongodb
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
+
+          ports:
+            - name: mongodb
+              containerPort: {{ .Values.mongodb.service.port }}
+              protocol: TCP
+
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flask-mongodb.secretName" . }}
+                  key: MONGO_INITDB_ROOT_USERNAME
+
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "flask-mongodb.secretName" . }}
+                  key: MONGO_INITDB_ROOT_PASSWORD
+
+          volumeMounts:
+            {{- if .Values.mongodb.persistence.enabled }}
+            - name: mongodb-storage
+              mountPath: /data/db
+            {{- end }}
+
+          resources:
+            requests:
+              memory: {{ .Values.mongodb.resources.requests.memory | quote }}
+              cpu: {{ .Values.mongodb.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.mongodb.resources.limits.memory | quote }}
+              cpu: {{ .Values.mongodb.resources.limits.cpu | quote }}
+
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: {{ .Values.mongodb.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.mongodb.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.mongodb.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.mongodb.probes.liveness.failureThreshold }}
+
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --quiet
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: {{ .Values.mongodb.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.mongodb.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.mongodb.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.mongodb.probes.readiness.failureThreshold }}
+
+      volumes:
+        {{- if .Values.mongodb.persistence.enabled }}
+        - name: mongodb-storage
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-mongodb-pvc
+        {{- end }}

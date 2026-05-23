@@ -1,0 +1,18 @@
+{{/*
+=============================================================================
+namespace.yaml — Helm Template: Namespace Oluşturma
+=============================================================================
+values.yaml'da namespace.create: true ise namespace oluşturur.
+Bu sayede namespace varlığını kullanıcı kontrol edebilir.
+=============================================================================
+*/}}
+
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "flask-mongodb.namespace" . }}
+  labels:
+    {{- include "flask-mongodb.labels" . | nindent 4 }}
+    environment: production
+{{- end }}

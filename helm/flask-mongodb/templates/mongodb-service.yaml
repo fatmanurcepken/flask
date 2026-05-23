@@ -1,0 +1,29 @@
+{{/*
+=============================================================================
+mongodb-service.yaml — Helm Template: MongoDB Service
+=============================================================================
+*/}}
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  # Service adı _helpers.tpl'deki fonksiyondan geliyor
+  # Bu ad ConfigMap'te MONGO_HOST olarak kullanılıyor
+  name: {{ include "flask-mongodb.mongodb.serviceName" . }}
+  namespace: {{ include "flask-mongodb.namespace" . }}
+  labels:
+    {{- include "flask-mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mongodb
+
+spec:
+  type: {{ .Values.mongodb.service.type }}
+
+  selector:
+    {{- include "flask-mongodb.mongodb.selectorLabels" . | nindent 4 }}
+
+  ports:
+    - name: mongodb
+      protocol: TCP
+      port: {{ .Values.mongodb.service.port }}
+      targetPort: {{ .Values.mongodb.service.port }}

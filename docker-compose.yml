@@ -1,0 +1,254 @@
+# =============================================================================
+# DOCKER COMPOSE — Production-Grade Service Orchestration
+# =============================================================================
+#
+# Docker Compose Nedir?
+# =====================
+# Birden fazla Docker container'ını tek bir YAML dosyasıyla tanımlayıp
+# yönetmenizi sağlayan bir araçtır. "docker compose up" komutuyla
+# tüm servisler (app + veritabanı + cache vs.) aynı anda ayağa kalkar.
+#
+# =============================================================================
+# SERVİSLER
+# =============================================================================
+# Her servis bir Docker container'ına karşılık gelir.
+# Servisler birbirini "service name" ile bulur (Docker DNS).
+
+services:
+
+  # ===========================================================================
+  # FLASK UYGULAMA SERVİSİ
+  # ===========================================================================
+  app:
+    # BUILD YAPILANDIRMASI
+    # --------------------
+    # context: Build context'in nerede olduğunu belirtir.
+    # Build context = Docker'ın erişebildiği dosya/dizin kümesidir.
+    # dockerfile: Hangi Dockerfile kullanılacağını belirtir.
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+
+    # CONTAINER İSMİ
+    # ---------------
+    # container_name belirtmezseniz Docker otomatik isim atar:
+    # flask-mongodb-app-1 gibi. Explicit isim vermek log takibini kolaylaştırır.
+    container_name: flask-app
+
+    # PORT MAPPING
+    # ------------
+    # Format: "HOST_PORT:CONTAINER_PORT"
+    # Sol taraf: Host makinenizde (laptop/sunucu) açılacak port
+    # Sağ taraf: Container içinde dinlenen port
+    #
+    # "5000:5000" → Host'un 5000 portuna gelen istekler
+    # container'ın 5000 portuna yönlendirilir.
+    # Tarayıcıda http://localhost:5000 ile erişirsiniz.
+    ports:
+      - "5000:5000"
+
+    # ENVIRONMENT DOSYASI
+    # -------------------
+    # env_file ile .env dosyasındaki tüm değişkenler container'a enjekte edilir.
+    # Bu sayede:
+    # 1. Şifreler docker-compose.yml'de görünmez (güvenlik)
+    # 2. Farklı ortamlar için farklı .env dosyaları kullanılabilir
+    #    (.env.dev, .env.staging, .env.prod)
+    # 3. .env dosyası .gitignore'a eklenerek versiyon kontrolünden çıkarılır
+    env_file:
+      - .env
+
+    # BAĞIMLILIKLAR (depends_on)
+    # --------------------------
+    # Flask uygulaması MongoDB'ye bağımlıdır.
+    # depends_on ile bu bağımlılık tanımlanır.
+    #
+    # condition: service_healthy
+    # ===========================
+    # Bu KRITIK bir ayardır!
+    #
+    # Sadece "depends_on: mongodb" yazsaydık:
+    # → Docker sadece MongoDB container'ının BAŞLAMASINI bekler.
+    # → Ama MongoDB henüz bağlantı kabul etmeye hazır olmayabilir!
+    # → Flask başlar, MongoDB'ye bağlanamaz → CRASH!
+    #
+    # condition: service_healthy ile:
+    # → Docker, MongoDB'nin healthcheck'ini GEÇENE KADAR bekler.
+    # → MongoDB gerçekten hazır olduktan sonra Flask başlar.
+    # → Bu pattern production'da kritiktir çünkü veritabanının başlama
+    #   süresi değişkendir (data miktarına göre 5 saniye ile 5 dakika arası).
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+    # RESTART POLİTİKASI
+    # -------------------
+    # restart: always → Container herhangi bir nedenle durduğunda
+    # Docker onu otomatik olarak yeniden başlatır.
+    #
+    # Seçenekler:
+    # - "no": Yeniden başlatma (varsayılan)
+    # - "always": Her zaman yeniden başlat (docker stop hariç)
+    # - "on-failure": Sadece hata ile çıkınca (exit code ≠ 0)
+    # - "unless-stopped": always gibi, ama docker stop ile durdurulanlar hariç
+    #
+    # Production'da "always" veya "unless-stopped" kullanılır.
+    # Bu, sunucu yeniden başlatıldığında servislerin otomatik gelmesini sağlar.
+    restart: always
+
+    # NETWORK
+    # -------
+    # Bu servisin bağlı olduğu network'ler.
+    # Aşağıda tanımlanan custom bridge network'e bağlanır.
+    networks:
+      - app-network
+
+  # ===========================================================================
+  # MONGODB VERİTABANI SERVİSİ
+  # ===========================================================================
+  mongodb:
+    # MongoDB resmi Docker image'ı
+    # mongo:7.0 = En güncel LTS (Long Term Support) versiyonu
+    # Versiyon pinlemek production'da zorunludur!
+    # "mongo:latest" kullanırsanız beklenmedik güncellemeler production'ı bozabilir.
+    image: mongo:7.0
+
+    # Container ismi
+    container_name: flask-mongodb
+
+    # PORT MAPPING
+    # ------------
+    # MongoDB'nin standart portu 27017'dir.
+    # Host'tan doğrudan erişmek istiyorsanız port mapping yapın.
+    # Production'da bu port genellikle dışarıya AÇILMAZ (güvenlik).
+    # Burada development kolaylığı için açıyoruz.
+    ports:
+      - "27017:27017"
+
+    # ENVIRONMENT DEĞİŞKENLERİ
+    # -------------------------
+    # MongoDB official image bu environment variable'ları okur:
+    #
+    # MONGO_INITDB_ROOT_USERNAME: Root kullanıcı adı
+    # MONGO_INITDB_ROOT_PASSWORD: Root şifresi
+    #
+    # Bu değişkenler SADECE ilk başlatmada (init) kullanılır.
+    # Yani volume'da zaten data varsa, bu değişkenler etkisizdir.
+    # Şifre değiştirmek için volume'u silip yeniden oluşturmanız gerekir.
+    env_file:
+      - .env
+
+    # VOLUME (Kalıcı Depolama)
+    # -------------------------
+    # Container'lar varsayılan olarak EPHEMERAL'dir (geçici).
+    # Container silindiğinde içindeki tüm data kaybolur!
+    #
+    # Volume ile MongoDB'nin data dizinini host'a bağlarız.
+    # Container silinse bile data volume'da kalır.
+    #
+    # Named Volume vs Bind Mount:
+    # - Named Volume (mongodb-data:/data/db):
+    #   Docker tarafından yönetilir, /var/lib/docker/volumes/ altında tutulur.
+    #   Taşınabilir ve yedeklenebilir.
+    #
+    # - Bind Mount (./data:/data/db):
+    #   Host'taki bir dizini doğrudan bağlar.
+    #   Development'ta dosya düzenleme için kullanışlı ama
+    #   OS bağımlı izin sorunları çıkarabilir.
+    #
+    # /data/db: MongoDB'nin varsayılan data dizinidir.
+    # Tüm collection'lar, index'ler ve veritabanı dosyaları burada tutulur.
+    volumes:
+      - mongodb-data:/data/db
+
+    # HEALTHCHECK
+    # -----------
+    # Container'ın sağlıklı olup olmadığını kontrol eder.
+    # Bu bilgi depends_on → condition: service_healthy için kullanılır.
+    #
+    # mongosh: MongoDB shell (mongo:7.0+'da mongosh kullanılır)
+    # db.adminCommand('ping'): MongoDB'ye basit bir ping komutu gönderir.
+    # Yanıt { ok: 1 } ise MongoDB hazırdır.
+    #
+    # --quiet: Gereksiz çıktıları bastırır
+    #
+    # interval: 10s → Her 10 saniyede bir kontrol et
+    # timeout: 5s  → Kontrol 5 saniye içinde yanıt vermezse başarısız say
+    # retries: 5   → 5 başarısız denemeden sonra "unhealthy" olarak işaretle
+    # start_period: 30s → Container başladıktan sonra 30 saniye bekle
+    #                      (MongoDB'nin başlangıç işlemlerini tamamlaması için)
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    # Restart politikası
+    restart: always
+
+    # Network
+    networks:
+      - app-network
+
+# =============================================================================
+# VOLUMES (Kalıcı Depolama Tanımları)
+# =============================================================================
+# Burada "named volume" tanımlıyoruz.
+# Named volume'lar Docker tarafından yönetilir ve container lifecycle'ından
+# bağımsızdır. Yani:
+#
+# docker compose down        → Volume SİLİNMEZ, data korunur ✅
+# docker compose down -v     → Volume SİLİNİR, data kaybolur ❌
+#
+# Volume'ları listelemek: docker volume ls
+# Volume detayı: docker volume inspect flask-mongodb_mongodb-data
+volumes:
+  mongodb-data:
+    # driver: local → Varsayılan driver. Data host makinesinde saklanır.
+    # Production'da farklı driver'lar kullanılabilir:
+    # - AWS EBS
+    # - Azure Disk
+    # - NFS
+    driver: local
+
+# =============================================================================
+# NETWORKS (Ağ Yapılandırması)
+# =============================================================================
+#
+# Docker Networking Mantığı
+# ==========================
+#
+# Docker'da her container kendi izole network namespace'ine sahiptir.
+# Varsayılan olarak container'lar birbirini GÖREMEZ.
+#
+# Custom bridge network oluşturarak:
+# 1. Container'lar birbirini SERVICE NAME ile bulabilir (DNS)
+# 2. İzolasyon sağlanır (farklı projelerin container'ları birbirini göremez)
+# 3. Otomatik DNS çözümleme çalışır
+#
+# Docker DNS Nasıl Çalışır?
+# -------------------------
+# Docker Compose aynı network'teki servisler için embedded DNS server çalıştırır.
+# app container'ında "mongodb" hostname'i kullandığımızda:
+#
+# 1. Container DNS sorgusu yapar: "mongodb IP adresi nedir?"
+# 2. Docker embedded DNS server yanıt verir: "172.18.0.3" (örnek)
+# 3. app container'ı bu IP'ye bağlanır
+#
+# Bu tamamen otomatiktir! IP adresi hardcode etmenize gerek yoktur.
+# Container yeniden başlasa bile Docker DNS otomatik güncellenir.
+#
+# NEDEN CUSTOM BRIDGE NETWORK?
+# ----------------------------
+# Docker varsayılan bridge network'ünde DNS çözümleme ÇALIŞMAZ!
+# Varsayılan bridge'de container'lar birbirini sadece IP ile bulabilir.
+# Custom bridge network'te ise service name ile bulabilir.
+# Bu yüzden her zaman custom network tanımlayın.
+networks:
+  app-network:
+    # Bridge driver: Aynı Docker host'undaki container'ları birbirine bağlar.
+    # Production'da farklı host'lardaki container'lar için:
+    # - overlay driver (Docker Swarm)
+    # - Kubernetes networking
+    driver: bridge

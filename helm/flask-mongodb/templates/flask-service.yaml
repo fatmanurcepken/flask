@@ -1,0 +1,30 @@
+{{/*
+=============================================================================
+flask-service.yaml — Helm Template: Flask Uygulama Service
+=============================================================================
+*/}}
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: {{ .Release.Name }}-flask-service
+  namespace: {{ include "flask-mongodb.namespace" . }}
+  labels:
+    {{- include "flask-mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flask-app
+
+spec:
+  type: {{ .Values.flask.service.type }}
+
+  selector:
+    {{- include "flask-mongodb.flask.selectorLabels" . | nindent 4 }}
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.flask.service.port }}
+      targetPort: {{ .Values.flask.service.port }}
+      {{- if and (eq .Values.flask.service.type "NodePort") .Values.flask.service.nodePort }}
+      nodePort: {{ .Values.flask.service.nodePort }}
+      {{- end }}

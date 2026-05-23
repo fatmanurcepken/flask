@@ -1,0 +1,75 @@
+# =============================================================================
+# pvc.yaml — MongoDB PersistentVolumeClaim Tanımı
+# =============================================================================
+#
+# Kubernetes'te Kalıcı Depolama (Persistent Storage)
+# ====================================================
+#
+# Docker Compose'da "named volume" kullandık:
+#   volumes:
+#     mongodb-data:/data/db
+#
+# Kubernetes'te storage üç kavramla yönetilir:
+#
+# 1. PersistentVolume (PV):
+#    Gerçek fiziksel depolama alanı. Cluster admin tarafından oluşturulur.
+#    (HostPath, NFS, AWS EBS, Azure Disk vb.)
+#    Minikube'de otomatik olarak yönetilir (dynamic provisioning).
+#
+# 2. PersistentVolumeClaim (PVC):
+#    Pod'un "Bu kadar storage istiyorum" dediği talep belgesi.
+#    Pod, PVC üzerinden storage'a erişir. Direkt PV'ye bağlanmaz.
+#    Bu soyutlama sayesinde altyapı değişse de uygulama kodu değişmez.
+#
+# 3. StorageClass:
+#    Storage'ın nasıl sağlanacağını tanımlar (SSD vs HDD, hız vb.)
+#    Minikube'de "standard" StorageClass otomatik gelir.
+#
+# Veri Akışı:
+#   Pod → PVC → PV → Fiziksel Disk
+#
+# NOT: Pod silinse bile PVC ve PV'deki data KALIR.
+#      Veriyi silmek için PVC'yi silmeniz gerekir.
+# =============================================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+
+metadata:
+  name: mongodb-pvc
+  namespace: flask-mongodb
+  labels:
+    app: mongodb
+    app.kubernetes.io/part-of: flask-mongodb
+
+spec:
+  # accessModes: Bu volume nasıl mount edilebilir?
+  # -----------------------------------------------
+  # ReadWriteOnce (RWO):
+  #   Tek bir node tarafından okuma/yazma ile mount edilebilir.
+  #   Veritabanları için standart seçim. Çünkü birden fazla node
+  #   aynı anda aynı veritabanı dosyasına yazarsa veri bozulur.
+  #
+  # ReadOnlyMany (ROX):
+  #   Birden fazla node tarafından salt okunur mount edilebilir.
+  #   Statik dosyalar, yapılandırma dosyaları için uygun.
+  #
+  # ReadWriteMany (RWX):
+  #   Birden fazla node tarafından okuma/yazma ile mount edilebilir.
+  #   NFS, CephFS gibi distributed file system'lar destekler.
+  accessModes:
+    - ReadWriteOnce
+
+  resources:
+    requests:
+      # MongoDB için 1GB başlangıç depolama alanı
+      # Minikube'de bu limit yoktur (host diskini kullanır)
+      # Cloud'da bu değer gerçek disk maliyetini belirler
+      storage: 1Gi
+
+  # storageClassName: Minikube'de "standard" kullanılır
+  # Cloud provider'larda farklı class'lar olabilir:
+  # - AWS: gp2, gp3, io1
+  # - Azure: managed-premium, managed-standard
+  # - GCP: standard, premium-rwo
+  storageClassName: standard
