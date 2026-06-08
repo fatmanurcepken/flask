@@ -47,7 +47,7 @@ pipeline {
                 sh """
                 mkdir -p /tmp/.kube
                 cp -r /var/jenkins_home/.kube/* /tmp/.kube/ || true
-                sed -i 's/127.0.0.1/host.docker.internal/g' /tmp/.kube/config
+                sed -i 's|server:.*|server: https://minikube:8443|g' /tmp/.kube/config
                 sed -i 's/certificate-authority-data:.*/insecure-skip-tls-verify: true/g' /tmp/.kube/config
                 sed -i 's/certificate-authority:.*/insecure-skip-tls-verify: true/g' /tmp/.kube/config
                 export KUBECONFIG=/tmp/.kube/config
