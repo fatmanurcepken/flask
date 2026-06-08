@@ -1,15 +1,7 @@
-{{/*
-=============================================================================
-mongodb-service.yaml — Helm Template: MongoDB Service
-=============================================================================
-*/}}
-
 apiVersion: v1
 kind: Service
 
 metadata:
-  # Service adı _helpers.tpl'deki fonksiyondan geliyor
-  # Bu ad ConfigMap'te MONGO_HOST olarak kullanılıyor
   name: {{ include "flask-mongodb.mongodb.serviceName" . }}
   namespace: {{ include "flask-mongodb.namespace" . }}
   labels:

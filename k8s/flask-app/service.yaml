@@ -1,30 +1,3 @@
-# =============================================================================
-# service.yaml — Flask Uygulama Kubernetes Service Tanımı
-# =============================================================================
-#
-# Flask uygulaması için NodePort Service kullanıyoruz.
-#
-# NodePort Nedir?
-# ===============
-# Her Kubernetes node'unda belirli bir port açılır (30000-32767 arası).
-# Dışarıdan bu porta gelen istekler Pod'lara yönlendirilir.
-#
-# Minikube'de Kullanımı:
-# -----------------------
-# minikube service flask-app-service -n flask-mongodb
-# → Bu komut otomatik olarak doğru URL'i açar (tunnel oluşturur)
-#
-# Neden LoadBalancer değil?
-# --------------------------
-# LoadBalancer, cloud provider'dan external IP talep eder.
-# Minikube'de bu çalışmaz (cloud provider yok).
-# NodePort, local development için idealdir.
-#
-# Docker Compose'daki karşılığı:
-#   ports:
-#     - "5000:5000"
-# =============================================================================
-
 apiVersion: v1
 kind: Service
 
@@ -36,22 +9,14 @@ metadata:
     app.kubernetes.io/part-of: flask-mongodb
 
 spec:
-  # NodePort: Cluster dışından erişim için
   type: NodePort
 
-  # selector: "app: flask-app" label'ına sahip Pod'lara yönlendir
-  # Deployment'taki tüm replica'lara otomatik load balance yapar
   selector:
     app: flask-app
 
   ports:
     - name: http
       protocol: TCP
-      # port: Service'in cluster içindeki portu
       port: 5000
-      # targetPort: Pod'daki container portu
       targetPort: 5000
-      # nodePort: Node'da açılacak dışarıdan erişilebilir port
-      # 30000-32767 aralığında olmak zorunda
-      # Belirtilmezse Kubernetes otomatik bir port atar
       nodePort: 30500

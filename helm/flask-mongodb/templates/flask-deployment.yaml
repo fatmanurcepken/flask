@@ -1,9 +1,3 @@
-{{/*
-=============================================================================
-flask-deployment.yaml — Helm Template: Flask Uygulama Deployment
-=============================================================================
-*/}}
-
 apiVersion: apps/v1
 kind: Deployment
 
@@ -36,7 +30,6 @@ spec:
         app.kubernetes.io/component: flask-app
 
     spec:
-      # initContainer: MongoDB hazır olana kadar bekle
       initContainers:
         - name: wait-for-mongodb
           image: busybox:1.36
@@ -62,7 +55,6 @@ spec:
               protocol: TCP
 
           env:
-            # Secret'tan hassas değerler
             - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -81,7 +73,6 @@ spec:
                   name: {{ include "flask-mongodb.secretName" . }}
                   key: FLASK_SECRET_KEY
 
-            # ConfigMap'ten hassas olmayan değerler
             - name: MONGO_HOST
               valueFrom:
                 configMapKeyRef:

@@ -1,28 +1,3 @@
-# =============================================================================
-# deployment.yaml — Flask Uygulama Deployment Tanımı
-# =============================================================================
-#
-# Bu Deployment, Flask/Gunicorn uygulamamızı Kubernetes'te çalıştırır.
-#
-# Önemli Farklar (Docker Compose'dan):
-# ======================================
-# Docker Compose'da:
-#   - depends_on: condition: service_healthy ile MongoDB hazır olana bekliyorduk
-#   - env_file: .env ile tüm değişkenleri yüklüyorduk
-#
-# Kubernetes'te:
-#   - initContainers ile MongoDB hazır olana kadar bekliyoruz
-#   - Secret ve ConfigMap'ten environment variable'ları okuyoruz
-#   - Liveness/Readiness probe ile /health endpoint'i kullanıyoruz
-#
-# Image Politikası (imagePullPolicy):
-# ====================================
-# "Never": Kubernetes image'ı uzaktan çekmeye çalışmaz.
-# Bu ayar Minikube local development için kritiktir!
-# Çünkü Minikube'e "minikube image build" ile yüklediğimiz local image'ı kullanıyoruz.
-# "Always" ile "IfNotPresent" sadece Docker Hub veya registry'den çekilen image'lar için.
-# =============================================================================
-
 apiVersion: apps/v1
 kind: Deployment
 
@@ -34,23 +9,12 @@ metadata:
     app.kubernetes.io/part-of: flask-mongodb
 
 spec:
-  # replicas: Flask uygulamasından 2 instance çalıştır
-  # ---------------------------------------------------
-  # MongoDB'den farklı olarak Flask stateless'tır → yatay ölçekleme mümkündür.
-  # 2 replica = yüksek erişilebilirlik + yük dengeleme
-  # Service, gelen istekleri otomatik olarak round-robin ile dağıtır.
   replicas: 2
 
   selector:
     matchLabels:
       app: flask-app
 
-  # strategy: RollingUpdate — Sıfır downtime güncelleme
-  # -----------------------------------------------------
-  # RollingUpdate:
-  #   - maxSurge: 1 → Güncelleme sırasında 1 ekstra Pod oluşturulabilir (2+1=3)
-  #   - maxUnavailable: 0 → Güncelleme sırasında hiçbir Pod kullanılamaz hale gelemez
-  #   Bu ayarlar: Yeni versiyonun Pod'u hazır olmadan eski versiyonun Pod'u silinmez.
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -64,25 +28,12 @@ spec:
         app.kubernetes.io/part-of: flask-mongodb
 
     spec:
-      # =======================================================================
-      # INIT CONTAINERS: Ön Koşul Kontrolleri
-      # =======================================================================
-      # initContainers, ana container başlamadan ÖNCE çalışan geçici container'lardır.
-      # Tümü başarıyla tamamlanmadan ana container başlamaz.
-      #
-      # Docker Compose'daki depends_on: condition: service_healthy'nin karşılığıdır.
-      # Fark: Kubernetes'te bu built-in gelmez, initContainer ile manuel yapılır.
       initContainers:
         - name: wait-for-mongodb
-          # busybox: Küçük ve hafif bir utility image
-          # nc (netcat): Port bağlantısı test aracı
           image: busybox:1.36
           command:
             - sh
             - -c
-            # MongoDB'nin 27017 portunu dinleyene kadar döngüde bekle
-            # -z: port tarama modu (veri göndermez)
-            # -w 2: 2 saniye timeout
             - |
               echo "MongoDB hazır olana kadar bekleniyor..."
               until nc -z -w 2 mongodb-service 27017; do
@@ -91,32 +42,16 @@ spec:
               done
               echo "MongoDB hazır! Flask başlatılıyor..."
 
-      # =======================================================================
-      # ANA CONTAINER: Flask/Gunicorn
-      # =======================================================================
       containers:
         - name: flask-app
-          # LOCAL IMAGE: Minikube'e yüklediğimiz image
-          # Bu image'ı build etmek için:
-          #   minikube image build -t flask-app:latest ./app
           image: flask-app:latest
-
-          # KRITIK: Never — Local image kullan, registry'den çekme
-          # Production'da bu değer "Always" olarak değiştirilmeli
-          # ve image bir container registry'ye push edilmeli (Docker Hub, ECR, GCR vb.)
           imagePullPolicy: Never
 
           ports:
             - containerPort: 5000
               name: http
 
-          # ENVIRONMENT VARIABLES
-          # ========================
-          # Docker Compose'daki env_file: .env karşılığı
-          # Hassas değerler → Secret
-          # Hassas olmayan değerler → ConfigMap
           env:
-            # Secret'tan okunan hassas değerler
             - name: MONGO_INITDB_ROOT_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -135,7 +70,6 @@ spec:
                   name: flask-mongodb-secret
                   key: FLASK_SECRET_KEY
 
-            # ConfigMap'ten okunan hassas olmayan değerler
             - name: MONGO_HOST
               valueFrom:
                 configMapKeyRef:
@@ -166,9 +100,6 @@ spec:
                   name: flask-mongodb-config
                   key: FLASK_DEBUG
 
-          # RESOURCE LIMITS
-          # ================
-          # Flask/Gunicorn için kaynaklar (4 worker → daha fazla CPU gerekir)
           resources:
             requests:
               memory: "128Mi"
@@ -177,24 +108,15 @@ spec:
               memory: "256Mi"
               cpu: "500m"
 
-          # LIVENESS PROBE — /health endpoint'ini kullanıyoruz
-          # =====================================================
-          # app.py'de tanımladığımız /health endpoint'i:
-          #   → Uygulamanın çalışıp çalışmadığını
-          #   → MongoDB bağlantısının aktif olup olmadığını kontrol eder
           livenessProbe:
             httpGet:
               path: /health
               port: 5000
-            initialDelaySeconds: 30   # Gunicorn'un başlaması için 30 saniye bekle
+            initialDelaySeconds: 30
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 3
 
-          # READINESS PROBE
-          # ================
-          # Pod traffic almaya hazır mı?
-          # Başarısız olursa Service bu Pod'a yönlendirme yapmaz.
           readinessProbe:
             httpGet:
               path: /health

@@ -1,59 +1,12 @@
-# =============================================================================
-# Chart.yaml — Helm Chart Metadata
-# =============================================================================
-#
-# Helm Nedir?
-# ===========
-# Helm, Kubernetes için "paket yöneticisi" olarak tanımlanır.
-# npm (Node.js) veya pip (Python) gibi düşünebilirsiniz.
-#
-# Helm Chart Nedir?
-# =================
-# Kubernetes kaynaklarını (Deployment, Service, ConfigMap vb.) bir araya
-# getiren ve parametrize edilebilir hale getiren dosya koleksiyonudur.
-#
-# Helm'in Sağladığı Avantajlar:
-# ------------------------------
-# 1. Tekrar kullanılabilirlik: Aynı chart farklı ortamlara (dev/staging/prod)
-#    farklı değerlerle deploy edilebilir
-# 2. Tek komutla kurulum: helm install → Tüm kaynaklar oluşturulur
-# 3. Sürüm yönetimi: helm upgrade/rollback ile versiyon kontrolü
-# 4. Şablon motoru: Go template ile dinamik YAML üretimi
-# 5. Bağımlılık yönetimi: Başka chart'lara bağımlılık tanımlanabilir
-#
-# Chart Yapısı:
-#   flask-mongodb/
-#   ├── Chart.yaml        ← Bu dosya: Chart metadata
-#   ├── values.yaml       ← Varsayılan değerler (override edilebilir)
-#   ├── templates/        ← Go template ile YAML dosyaları
-#   │   └── *.yaml
-#   └── charts/           ← Bağımlı chart'lar (dependencies)
-# =============================================================================
-
-# Helm API versiyonu — v2: Helm 3 için (Helm 2 artık desteklenmiyor)
 apiVersion: v2
-
-# Chart'ın adı
 name: flask-mongodb
-
-# Kısa açıklama
 description: >
   Flask Task Manager uygulaması ve MongoDB veritabanı için
   production-ready Kubernetes Helm Chart'ı.
-
-# Chart türü:
-# application: Deploy edilebilen uygulama (bu chart türümüz)
-# library: Diğer chart'lara yardımcı fonksiyon sağlar (deploy edilemez)
 type: application
-
-# Chart sürümü — Bu Chart'ın kendisinin sürümü (SemVer formatında)
-# Chart değiştiğinde bu sürümü artırın (uygulama sürümü değil!)
 version: 0.1.0
-
-# Uygulamanın sürümü — Deploy edilen uygulamanın sürümü
 appVersion: "1.0.0"
 
-# Anahtar kelimeler — Helm Hub'da arama için
 keywords:
   - flask
   - mongodb
@@ -61,15 +14,12 @@ keywords:
   - task-manager
   - kubernetes
 
-# Chart yazarları
 maintainers:
   - name: Flask MongoDB Team
     email: team@example.com
 
-# Minimum Helm versiyonu
 kubeVersion: ">=1.20.0"
 
-# İlgili kaynaklar (isteğe bağlı)
 home: https://github.com/example/flask-mongodb
 sources:
   - https://github.com/example/flask-mongodb

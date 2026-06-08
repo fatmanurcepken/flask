@@ -1,32 +1,7 @@
-# =============================================================================
-# namespace.yaml — Kubernetes Namespace Tanımı
-# =============================================================================
-#
-# Namespace Nedir?
-# ================
-# Kubernetes'te kaynakları (Pod, Service, Deployment vb.) mantıksal olarak
-# gruplandırmak için kullanılan sanal kümelerdir.
-#
-# Neden Namespace Kullanıyoruz?
-# ------------------------------
-# 1. İzolasyon: Farklı projeler birbirini etkilemez
-# 2. Erişim kontrolü (RBAC): Namespace bazlı izin yönetimi
-# 3. Resource quota: Namespace'e CPU/Memory limiti atanabilir
-# 4. Temizleme kolaylığı: "kubectl delete namespace flask-mongodb" ile
-#    tüm kaynakları tek komutla silebilirsiniz
-#
-# Varsayılan Namespace'ler:
-# - default: Namespace belirtilmezse kullanılır
-# - kube-system: Kubernetes sistem bileşenleri
-# - kube-public: Herkese açık kaynaklar
-# =============================================================================
-
 apiVersion: v1
 kind: Namespace
 metadata:
   name: flask-mongodb
   labels:
-    # Etiketler kaynakları gruplamak ve filtrelemek için kullanılır
-    # kubectl get all -l app.kubernetes.io/part-of=flask-mongodb
     app.kubernetes.io/part-of: flask-mongodb
     environment: production

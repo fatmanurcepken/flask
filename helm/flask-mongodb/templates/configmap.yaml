@@ -1,14 +1,3 @@
-{{/*
-=============================================================================
-configmap.yaml — Helm Template: Kubernetes ConfigMap
-=============================================================================
-Hassas olmayan yapılandırma değerlerini tanımlar.
-MONGO_HOST değeri dinamik olarak _helpers.tpl'deki
-flask-mongodb.mongodb.serviceName fonksiyonundan üretilir.
-Bu sayede release adı değişse bile Service adı tutarlı kalır.
-=============================================================================
-*/}}
-
 apiVersion: v1
 kind: ConfigMap
 
@@ -19,16 +8,8 @@ metadata:
     {{- include "flask-mongodb.labels" . | nindent 4 }}
 
 data:
-  # MongoDB host: Release adına göre dinamik olarak üretilir
-  # Örnek: "flask-app-mongodb-service" (release adı "flask-app" ise)
   MONGO_HOST: {{ include "flask-mongodb.mongodb.serviceName" . | quote }}
-
-  # MongoDB portu
   MONGO_PORT: {{ .Values.mongodb.service.port | quote }}
-
-  # Veritabanı adı — values.yaml'dan okunur
   MONGO_DB_NAME: {{ .Values.config.mongoDbName | quote }}
-
-  # Flask environment ayarları
   FLASK_ENV: {{ .Values.flask.env.FLASK_ENV | quote }}
   FLASK_DEBUG: {{ .Values.flask.env.FLASK_DEBUG | quote }}

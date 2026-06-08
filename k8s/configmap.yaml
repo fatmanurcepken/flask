@@ -1,35 +1,3 @@
-# =============================================================================
-# configmap.yaml — Kubernetes ConfigMap Tanımı
-# =============================================================================
-#
-# ConfigMap Nedir?
-# ================
-# Hassas olmayan yapılandırma verilerini key-value çiftleri olarak
-# saklamak için kullanılan Kubernetes kaynağıdır.
-#
-# Kullanım Alanları:
-# ------------------
-# - Uygulama yapılandırma parametreleri (port, hostname, timeout)
-# - Feature flag'leri
-# - Yapılandırma dosyaları (nginx.conf, application.properties vb.)
-#
-# ConfigMap Nasıl Kullanılır?
-# ---------------------------
-# 1. Environment variable olarak Pod'a enjekte etme (bu dosyada kullanılan yöntem)
-# 2. Volume olarak mount etme (dosya içeriği olarak)
-# 3. Komut satırı argümanı olarak kullanma
-#
-# Docker Compose ile Karşılaştırma:
-# -----------------------------------
-# Docker Compose'da:
-#   env_file: .env
-#   → Tüm .env dosyası container'a enjekte edilir
-#
-# Kubernetes'te:
-#   Secret → Hassas değerler (şifreler)
-#   ConfigMap → Hassas olmayan değerler (host, port, ortam adı)
-# =============================================================================
-
 apiVersion: v1
 kind: ConfigMap
 
@@ -40,28 +8,8 @@ metadata:
     app.kubernetes.io/part-of: flask-mongodb
 
 data:
-  # =============================================================
-  # MongoDB Yapılandırması
-  # =============================================================
-
-  # MongoDB'nin Kubernetes Service adı
-  # Kubernetes'te DNS çözümleme şu formatta çalışır:
-  # <service-name>.<namespace>.svc.cluster.local
-  # Kısa form (aynı namespace içinde): mongodb-service
   MONGO_HOST: "mongodb-service"
-
-  # MongoDB standart portu
   MONGO_PORT: "27017"
-
-  # Uygulama veritabanı adı
   MONGO_DB_NAME: "TaskManager"
-
-  # =============================================================
-  # Flask Yapılandırması
-  # =============================================================
-
-  # Flask ortamı
   FLASK_ENV: "production"
-
-  # Debug modu kapalı (production'da her zaman 0 olmalı)
   FLASK_DEBUG: "0"

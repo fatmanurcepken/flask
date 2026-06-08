@@ -1,41 +1,13 @@
-# =============================================================================
-# setup-minikube.ps1 - Flask + MongoDB Kubernetes Ortami Kurulum Scripti
-# =============================================================================
-#
-# KULLANIM:
-#   PowerShell'de calistirmak icin:
-#     .\scripts\setup-minikube.ps1
-#
-# ON KOSULLAR:
-#   1. Docker Desktop kurulu ve calisiyor olmali
-#   2. Internet baglantisi mevcut olmali
-#
-# BU SCRIPT NE YAPAR?
-#   1. Gerekli araclarin kurulu olup olmadigini kontrol eder
-#   2. Minikube'u Docker driver ile baslatir
-#   3. Flask uygulama Docker image'ini Minikube'e yukler
-#   4. Kubernetes namespace olusturur
-#   5. Tum manifestolari uygular (YAML dosyalari)
-#   6. Servislerin hazir olmasini bekler
-#   7. Uygulamaya tarayicidan nasil erisilecegini gosterir
-# =============================================================================
-
-# Hata varsa scripti durdur
 $ErrorActionPreference = "Stop"
 
-# Renkli cikti icin yardimci fonksiyonlar
 function Write-Info  { param($msg) Write-Host "[INFO]  $msg" -ForegroundColor Cyan }
 function Write-OK    { param($msg) Write-Host "[OK]    $msg" -ForegroundColor Green }
 function Write-Warn  { param($msg) Write-Host "[WARN]  $msg" -ForegroundColor Yellow }
 function Write-Fail  { param($msg) Write-Host "[ERROR] $msg" -ForegroundColor Red }
 function Write-Step  { param($msg) Write-Host "`n========== $msg ==========" -ForegroundColor Magenta }
 
-# =============================================================================
-# ADIM 1: On Kosul Kontrolleri
-# =============================================================================
 Write-Step "On Kosul Kontrolleri"
 
-# Docker kontrolu
 Write-Info "Docker kontrol ediliyor..."
 try {
     $dockerVersion = docker version --format "{{.Server.Version}}" 2>&1
@@ -47,7 +19,6 @@ try {
     exit 1
 }
 
-# Minikube kontrolu
 Write-Info "Minikube kontrol ediliyor..."
 $minikubeInstalled = Get-Command minikube -ErrorAction SilentlyContinue
 if (-not $minikubeInstalled) {
@@ -55,7 +26,6 @@ if (-not $minikubeInstalled) {
     try {
         winget install Kubernetes.minikube --silent --accept-package-agreements --accept-source-agreements
         Write-OK "Minikube basariyla kuruldu!"
-        # PATH'i guncelle
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
     } catch {
         Write-Fail "Minikube otomatik kurulamadi."
@@ -67,7 +37,6 @@ if (-not $minikubeInstalled) {
     Write-OK "Minikube kurulu: $minikubeVersion"
 }
 
-# kubectl kontrolu
 Write-Info "kubectl kontrol ediliyor..."
 $kubectlInstalled = Get-Command kubectl -ErrorAction SilentlyContinue
 if (-not $kubectlInstalled) {
@@ -86,19 +55,14 @@ if (-not $kubectlInstalled) {
     Write-OK "kubectl kurulu: $kubectlVersion"
 }
 
-# =============================================================================
-# ADIM 2: Minikube Baslatma
-# =============================================================================
 Write-Step "Minikube Baslatiliyor"
 
-# Minikube durumunu kontrol et
 $minikubeStatus = minikube status --format "{{.Host}}" 2>&1
 if ($minikubeStatus -eq "Running") {
     Write-OK "Minikube zaten calisiyor. Atlaniyor..."
 } else {
     Write-Info "Minikube baslatiliyor (driver: docker, memory: 4gb, cpus: 2)..."
-    Write-Info "Bu islem ilk seferinde birkac dakika surebilir..."
-    
+
     minikube start `
         --driver=docker `
         --memory=4096 `
@@ -114,20 +78,15 @@ if ($minikubeStatus -eq "Running") {
     Write-OK "Minikube basariyla baslatildi!"
 }
 
-# Cluster bilgilerini goster
 Write-Info "Cluster bilgileri:"
 kubectl cluster-info
 
-# =============================================================================
-# ADIM 3: Docker Image Build ve Minikube'e Yukleme
-# =============================================================================
 Write-Step "Docker Image Build"
 
 Write-Info "Minikube Docker ortami yapilandiriliyor..."
 Write-Info "Projenin kok dizininde (flask-mongodb/) oldugunuzdan emin olun."
 
 Write-Info "Flask uygulama image'i build ediliyor..."
-Write-Warn "NOT: Bu komut Minikube Docker ortaminda calisir."
 Write-Warn "Lutfen su komutu ayri bir terminalde calistirin:"
 Write-Host ""
 Write-Host "  minikube image build -t flask-app:latest ./app" -ForegroundColor Yellow
@@ -141,9 +100,6 @@ if ($buildChoice -ne "E" -and $buildChoice -ne "e") {
 
 Write-OK "Image build tamamlandi!"
 
-# =============================================================================
-# ADIM 4: Kubernetes Manifestolarini Uygula
-# =============================================================================
 Write-Step "Kubernetes Manifestolari Uygulaniyor"
 
 if (-not (Test-Path ".\k8s")) {
@@ -173,9 +129,6 @@ kubectl apply -f .\k8s\flask-app\service.yaml
 
 Write-OK "Tum kaynaklar olusturuldu!"
 
-# =============================================================================
-# ADIM 5: Servislerin Hazir Olmasini Bekle
-# =============================================================================
 Write-Step "Servisler Kontrol Ediliyor"
 
 Write-Info "MongoDB deployment hazir olana kadar bekleniyor (max 3 dakika)..."
@@ -194,9 +147,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-OK "Flask uygulamasi hazir!"
 
-# =============================================================================
-# ADIM 6: Durum Ozeti
-# =============================================================================
 Write-Step "Kurulum Tamamlandi - Durum Ozeti"
 
 Write-Info "Namespace icindeki tum kaynaklar:"

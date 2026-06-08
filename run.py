@@ -2,7 +2,6 @@ from flask import Flask, render_template, redirect
 from pymongo import MongoClient
 from classes import *
 
-# config system
 app = Flask(__name__)
 app.config.update(dict(SECRET_KEY='yoursecretkey'))
 client = MongoClient('localhost:27017')
@@ -26,7 +25,7 @@ def createTask(form):
     priority = form.priority.data
     shortdesc = form.shortdesc.data
     task_id = db.settings.find_one()['value']
-    
+
     task = {'id':task_id, 'title':title, 'shortdesc':shortdesc, 'priority':priority}
 
     db.tasks.insert_one(task)
@@ -38,7 +37,6 @@ def deleteTask(form):
     title = form.title.data
 
     if(key):
-        print(key, type(key))
         db.tasks.delete_many({'id':int(key)})
     else:
         db.tasks.delete_many({'title':title})
@@ -48,7 +46,7 @@ def deleteTask(form):
 def updateTask(form):
     key = form.key.data
     shortdesc = form.shortdesc.data
-    
+
     db.tasks.update_one(
         {"id": int(key)},
         {"$set":
@@ -66,13 +64,11 @@ def resetTask(form):
 
 @app.route('/', methods=['GET','POST'])
 def main():
-    # create form
     cform = CreateTask(prefix='cform')
     dform = DeleteTask(prefix='dform')
     uform = UpdateTask(prefix='uform')
     reset = ResetTask(prefix='reset')
 
-    # response
     if cform.validate_on_submit() and cform.create.data:
         return createTask(cform)
     if dform.validate_on_submit() and dform.delete.data:
@@ -82,7 +78,6 @@ def main():
     if reset.validate_on_submit() and reset.reset.data:
         return resetTask(reset)
 
-    # read all data
     docs = db.tasks.find()
     data = []
     for i in docs:

@@ -1,40 +1,3 @@
-# =============================================================================
-# service.yaml — MongoDB Kubernetes Service Tanımı
-# =============================================================================
-#
-# Service Nedir?
-# ==============
-# Kubernetes'te Pod'lar geçicidir. Yeniden başladıklarında IP adresleri değişir.
-# Service, Pod'lara sabit bir DNS adı ve IP adresi sağlar.
-#
-# Docker Compose'daki karşılığı:
-#   Docker Compose'da service name ile DNS çözümleme otomatikti.
-#   Örnek: MONGO_HOST=mongodb
-#
-# Kubernetes'te:
-#   Service oluşturarak aynı işlevi manuel sağlıyoruz.
-#   Service adı: mongodb-service
-#   DNS: mongodb-service.flask-mongodb.svc.cluster.local
-#   Kısa form (aynı namespace): mongodb-service
-#
-# Service Türleri:
-# -----------------
-# 1. ClusterIP (varsayılan): Sadece cluster içinde erişilebilir
-#    → Veritabanları, iç servisler için ideal
-#
-# 2. NodePort: Her node'un belirli bir portunu açar (30000-32767)
-#    → Local development'ta dışarıdan erişim için kullanılır
-#
-# 3. LoadBalancer: Cloud provider'dan external load balancer ister
-#    → Production'da dışarıya açılacak servisler için
-#
-# 4. ExternalName: DNS alias oluşturur (cluster dışı servislere)
-#
-# MongoDB için ClusterIP kullanıyoruz çünkü:
-# - Veritabanı dışarıya açılmamalıdır (güvenlik)
-# - Sadece Flask uygulamasının erişmesi gerekir
-# =============================================================================
-
 apiVersion: v1
 kind: Service
 
@@ -46,20 +9,13 @@ metadata:
     app.kubernetes.io/part-of: flask-mongodb
 
 spec:
-  # type: ClusterIP — Sadece cluster içinden erişilebilir
-  # Bu sayede MongoDB internete açılmaz (güvenlik best practice)
   type: ClusterIP
 
-  # selector: Bu Service hangi Pod'lara traffic yönlendirecek?
-  # ----------------------------------------------------------
-  # Deployment'taki Pod label'ları ile eşleşmeli: app: mongodb
   selector:
     app: mongodb
 
   ports:
     - name: mongodb
       protocol: TCP
-      # port: Service'in dinleyeceği port (cluster içindeki diğer Pod'lar buraya bağlanır)
       port: 27017
-      # targetPort: Traffic'in yönlendirileceği Pod'daki port
       targetPort: 27017

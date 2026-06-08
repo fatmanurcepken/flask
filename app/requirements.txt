@@ -1,42 +1,4 @@
-# =============================================================================
-# Python Bağımlılıkları — Production
-# =============================================================================
-#
-# NEDEN VERSİYON PİNLEME?
-# -----------------------
-# Production'da "Flask" yerine "Flask==3.1.1" yazmak kritiktir.
-# Çünkü:
-# 1. Tekrarlanabilirlik: Her build aynı sonucu verir
-# 2. Güvenlik: Beklenmedik güncellemeler production'ı bozamaz
-# 3. Takım çalışması: Herkes aynı versiyonları kullanır
-#
-# Versiyon numaralarını belirlemek için:
-#   pip freeze > requirements.txt
-
-# Web framework
 Flask==3.1.1
-
-# Flask-WTF: Form yönetimi ve CSRF koruması
 Flask-WTF==1.2.2
-
-# PyMongo: MongoDB Python driver'ı
 pymongo==4.11.3
-
-# =============================================================================
-# Gunicorn — Production WSGI Server
-# =============================================================================
-#
-# NEDEN GUNICORN?
-# ---------------
-# Flask'ın built-in development server'ı (flask run) production'da kullanılmamalıdır:
-# 1. Single-threaded: Aynı anda sadece bir istek işleyebilir
-# 2. Güvenlik: Güvenlik denetimleri yoktur
-# 3. Performans: Yüksek trafik altında çöker
-# 4. Flask'ın kendi dokümantasyonu bile bunu uyarır!
-#
-# Gunicorn ise:
-# 1. Multi-worker: Birden fazla istek paralel işlenir
-# 2. Pre-fork modeli: Her worker ayrı bir process olarak çalışır
-# 3. Graceful restart: Zero-downtime deployment mümkün
-# 4. Production-tested: Instagram, Pinterest gibi devler kullanır
 gunicorn==23.0.0

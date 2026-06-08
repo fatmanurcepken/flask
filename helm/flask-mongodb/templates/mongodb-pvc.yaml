@@ -1,12 +1,3 @@
-{{/*
-=============================================================================
-mongodb-pvc.yaml — Helm Template: MongoDB PersistentVolumeClaim
-=============================================================================
-values.yaml'da mongodb.persistence.enabled: true ise PVC oluşturur.
-Bu sayede persistence isteğe bağlı hale gelir (test ortamları için kapatılabilir).
-=============================================================================
-*/}}
-
 {{- if .Values.mongodb.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
